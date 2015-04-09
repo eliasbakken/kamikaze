@@ -893,7 +893,7 @@ populate_rootfs () {
 		echo "" >> ${wfile}
 	fi
 
-	cmdline="quiet"
+	cmdline="quiet consoleblank=0 fbcon=rotate:1"
 	if [ "x${enable_systemd}" = "xenabled" ] ; then
 		cmdline="${cmdline} init=/lib/systemd/systemd"
 	fi
@@ -928,7 +928,7 @@ populate_rootfs () {
 
 		if [ "x${bbb_flasher}" = "xenable" ] ; then
 			echo "##enable BBB: eMMC Flasher:" >> ${wfile}
-			echo "cmdline=init=/opt/scripts/tools/eMMC/init-eMMC-flasher-v3.sh" >> ${wfile}
+			echo "cmdline=init=/opt/scripts/tools/eMMC/init-eMMC-flasher-v3.sh consoleblank=0 fbcon=rotate:1" >> ${wfile}
 		elif [ "x${bbg_flasher}" = "xenable" ] ; then
 			echo "##enable BBG: eMMC Flasher:" >> ${wfile}
 			echo "cmdline=init=/opt/scripts/tools/eMMC/init-eMMC-flasher-v3-bbg.sh" >> ${wfile}
@@ -1098,6 +1098,7 @@ populate_rootfs () {
 
 	if [ ! -f ${TEMPDIR}/disk/opt/scripts/boot/generic-startup.sh ] ; then
 		git clone https://github.com/RobertCNelson/boot-scripts ${TEMPDIR}/disk/opt/scripts/ --depth 1
+		sed -i "s:ocp:platform/ocp:" ${TEMPDIR}/disk/opt/scripts/tools/eMMC/init-eMMC-flasher-v3.sh
 	fi
 
 	if [ "x${drm}" = "xomapdrm" ] ; then
