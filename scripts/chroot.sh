@@ -833,6 +833,7 @@ cat > ${DIR}/chroot_script.sh <<-__EOF__
 	is_this_qemu
 	stop_init
 
+	echo "10.24.2.241 feeds.thing-printer.com" >> /etc/hosts
 	install_pkg_updates
 	install_pkgs
 	system_tweaks

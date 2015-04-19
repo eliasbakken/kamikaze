@@ -882,6 +882,7 @@ populate_rootfs () {
 		echo "uname_r=${kernel_override}" >> ${wfile}
 	fi
 
+	dtb="am335x-boneblack-replicape.dtb"
 	if [ ! "x${dtb}" = "x" ] ; then
 		echo "dtb=${dtb}" >> ${wfile}
 	else
@@ -1097,8 +1098,7 @@ populate_rootfs () {
 	fi
 
 	if [ ! -f ${TEMPDIR}/disk/opt/scripts/boot/generic-startup.sh ] ; then
-		git clone https://github.com/RobertCNelson/boot-scripts ${TEMPDIR}/disk/opt/scripts/ --depth 1
-		sed -i "s:ocp:platform/ocp:" ${TEMPDIR}/disk/opt/scripts/tools/eMMC/init-eMMC-flasher-v3.sh
+		git clone https://github.com/eliasbakken/boot-scripts ${TEMPDIR}/disk/opt/scripts/ --depth 1
 	fi
 
 	if [ "x${drm}" = "xomapdrm" ] ; then
