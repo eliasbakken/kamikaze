@@ -305,7 +305,7 @@ unmount_all_drive_partitions () {
 		umount ${DRIVE} >/dev/null 2>&1 || true
 	done
 
-	echo "Zeroing out Partition Table"
+	echo "Zeroing out Drive"
 	echo "-----------------------------"
 	dd if=/dev/zero of=${media} bs=1M count=100 || drive_error_ro
 	sync
@@ -314,18 +314,62 @@ unmount_all_drive_partitions () {
 }
 
 sfdisk_partition_layout () {
-	LC_ALL=C sfdisk --force --in-order --Linux --unit M "${media}" <<-__EOF__
-		${conf_boot_startmb},${conf_boot_endmb},${sfdisk_fstype},*
-		,,,-
-	__EOF__
+	sfdisk_options="--force --in-order --Linux --unit M"
+	test_sfdisk=$(LC_ALL=C sfdisk --help | grep -m 1 -e "--in-order" || true)
+	if [ "x${test_sfdisk}" = "x" ] ; then
+		echo "log: sfdisk: 2.26.x or greater detected"
+		sfdisk_options="--force"
+		conf_boot_startmb="${conf_boot_startmb}M"
+		conf_boot_endmb="${conf_boot_endmb}M"
+		conf_var_startmb="${conf_var_startmb}M"
+	fi
+
+	if [ "x${option_ro_root}" = "xenable" ] ; then
+
+		LC_ALL=C sfdisk ${sfdisk_options} "${media}" <<-__EOF__
+			${conf_boot_startmb},${conf_boot_endmb},${sfdisk_fstype},*
+			,${conf_var_startmb},,-
+			,,,-
+		__EOF__
+
+		media_rootfs_var_partition=3
+	else
+
+		LC_ALL=C sfdisk ${sfdisk_options} "${media}" <<-__EOF__
+			${conf_boot_startmb},${conf_boot_endmb},${sfdisk_fstype},*
+			,,,-
+		__EOF__
+
+	fi
 
 	sync
 }
 
 sfdisk_single_partition_layout () {
-	LC_ALL=C sfdisk --force --in-order --Linux --unit M "${media}" <<-__EOF__
-		${conf_boot_startmb},,${sfdisk_fstype},*
-	__EOF__
+	sfdisk_options="--force --in-order --Linux --unit M"
+	test_sfdisk=$(LC_ALL=C sfdisk --help | grep -m 1 -e "--in-order" || true)
+	if [ "x${test_sfdisk}" = "x" ] ; then
+		echo "log: sfdisk: 2.26.x or greater detected"
+		sfdisk_options="--force"
+		conf_boot_startmb="${conf_boot_startmb}M"
+		conf_var_startmb="${conf_var_startmb}M"
+	fi
+
+	if [ "x${option_ro_root}" = "xenable" ] ; then
+
+		LC_ALL=C sfdisk ${sfdisk_options} "${media}" <<-__EOF__
+			${conf_boot_startmb},${conf_var_startmb},${sfdisk_fstype},*
+			,,,-
+		__EOF__
+
+		media_rootfs_var_partition=2
+	else
+
+		LC_ALL=C sfdisk ${sfdisk_options} "${media}" <<-__EOF__
+			${conf_boot_startmb},,${sfdisk_fstype},*
+		__EOF__
+
+	fi
 
 	sync
 }
@@ -430,7 +474,11 @@ format_boot_partition () {
 }
 
 format_rootfs_partition () {
-	mkfs="mkfs.${ROOTFS_TYPE}"
+	if [ "x${option_ro_root}" = "xenable" ] ; then
+		mkfs="mkfs.ext2"
+	else
+		mkfs="mkfs.${ROOTFS_TYPE}"
+	fi
 	mkfs_partition="${media_prefix}${media_rootfs_partition}"
 	mkfs_label="-L ${ROOTFS_LABEL}"
 
@@ -445,6 +493,27 @@ format_rootfs_partition () {
 			rootfs_drive="UUID=${rootfs_uuid}"
 		else
 			rootfs_drive="${conf_root_device}p${media_rootfs_partition}"
+		fi
+	fi
+
+	if [ "x${option_ro_root}" = "xenable" ] ; then
+
+		mkfs="mkfs.${ROOTFS_TYPE}"
+		mkfs_partition="${media_prefix}${media_rootfs_var_partition}"
+		mkfs_label="-L var"
+
+		format_partition
+
+		if [ "x${build_img_file}" = "xenable" ] ; then
+			rootfs_var_drive="${conf_root_device}p${media_rootfs_var_partition}"
+		else
+			unset rootfs_var_uuid
+			rootfs_var_uuid=$(/sbin/blkid -c /dev/null -s UUID -o value ${mkfs_partition} || true)
+			if [ ! "x${rootfs_var_uuid}" = "x" ] ; then
+				rootfs_var_drive="UUID=${rootfs_var_uuid}"
+			else
+				rootfs_var_drive="${conf_root_device}p${media_rootfs_var_partition}"
+			fi
 		fi
 	fi
 }
@@ -462,6 +531,9 @@ create_partitions () {
 		echo "Using sfdisk to create partition layout"
 		echo "Version: `LC_ALL=C sfdisk --version`"
 		echo "-----------------------------"
+		if [ "x${bborg_production}" = "xenable" ] ; then
+			conf_boot_endmb="96"
+		fi
 		sfdisk_partition_layout
 		;;
 	dd_uboot_boot)
@@ -609,6 +681,9 @@ populate_boot () {
 		fi
 	fi
 
+	lsblk | grep -v sr0
+	echo "-----------------------------"
+
 	if [ "${spl_name}" ] ; then
 		if [ -f ${TEMPDIR}/dl/${SPL} ] ; then
 			if [ ! "${bootloader_installed}" ] ; then
@@ -633,7 +708,7 @@ populate_boot () {
 		cp -v ${TEMPDIR}/dl/distro_defaults.scr ${TEMPDIR}/disk/boot.scr
 	fi
 
-	if [ "x${conf_board}" = "xam335x_boneblack" ] || [ "x${conf_board}" = "xam335x_evm" ] ; then
+	if [ "x${conf_board}" = "xam335x_boneblack" ] || [ "x${conf_board}" = "xam335x_evm" ] || [ "x${conf_board}" = "xarduino-tre" ] ; then
 
 		if [ ! "x${bbb_old_bootloader_in_emmc}" = "xenable" ] ; then
 			wfile="${TEMPDIR}/disk/bbb-uEnv.txt"
@@ -642,6 +717,10 @@ populate_boot () {
 		else
 			wfile="${TEMPDIR}/disk/uEnv.txt"
 			echo "##These are needed to be compliant with Angstrom's 2013.06.20 u-boot." > ${wfile}
+		fi
+
+		if [ "x${conf_board}" = "xarduino-tre" ] ; then
+			wfile="${TEMPDIR}/disk/uEnv.txt"
 		fi
 
 		echo "" >> ${wfile}
@@ -654,16 +733,22 @@ populate_boot () {
 		echo "" >> ${wfile}
 		echo "##These are needed to be compliant with Debian 2014-05-14 u-boot." >> ${wfile}
 		echo "" >> ${wfile}
-		echo "loadximage=load mmc 0:${media_rootfs_partition} \${loadaddr} /boot/vmlinuz-\${uname_r}" >> ${wfile}
-		echo "loadxfdt=load mmc 0:${media_rootfs_partition} \${fdtaddr} /boot/dtbs/\${uname_r}/\${fdtfile}" >> ${wfile}
-		echo "loadxrd=load mmc 0:${media_rootfs_partition} \${rdaddr} /boot/initrd.img-\${uname_r}; setenv rdsize \${filesize}" >> ${wfile}
+		echo "loadximage=echo debug: [/boot/vmlinuz-\${uname_r}] ... ; load mmc 0:${media_rootfs_partition} \${loadaddr} /boot/vmlinuz-\${uname_r}" >> ${wfile}
+		echo "loadxfdt=echo debug: [/boot/dtbs/\${uname_r}/\${fdtfile}] ... ;load mmc 0:${media_rootfs_partition} \${fdtaddr} /boot/dtbs/\${uname_r}/\${fdtfile}" >> ${wfile}
+		echo "loadxrd=echo debug: [/boot/initrd.img-\${uname_r}] ... ; load mmc 0:${media_rootfs_partition} \${rdaddr} /boot/initrd.img-\${uname_r}; setenv rdsize \${filesize}" >> ${wfile}
 		echo "loaduEnvtxt=load mmc 0:${media_rootfs_partition} \${loadaddr} /boot/uEnv.txt ; env import -t \${loadaddr} \${filesize};" >> ${wfile}
 		echo "check_dtb=if test -n \${dtb}; then setenv fdtfile \${dtb};fi;" >> ${wfile}
 		echo "loadall=run loaduEnvtxt; run check_dtb; run loadximage; run loadxrd; run loadxfdt;" >> ${wfile}
 		echo "" >> ${wfile}
 		echo "mmcargs=setenv bootargs console=tty0 console=\${console} \${optargs} \${cape_disable} \${cape_enable} root=/dev/mmcblk0p${media_rootfs_partition} rootfstype=\${mmcrootfstype} \${cmdline}" >> ${wfile}
 		echo "" >> ${wfile}
-		echo "uenvcmd=run loadall; run mmcargs; bootz \${loadaddr} \${rdaddr}:\${rdsize} \${fdtaddr};" >> ${wfile}
+
+		if [ "x${conf_board}" = "xarduino-tre" ] ; then
+			echo "uenvcmd=run loadall; run mmcargs; echo debug: [\${bootargs}] ... ; echo debug: [bootz \${loadaddr} - \${fdtaddr}] ... ; bootz \${loadaddr} - \${fdtaddr};" >> ${wfile}
+		else
+			echo "uenvcmd=run loadall; run mmcargs; echo debug: [\${bootargs}] ... ; echo debug: [bootz \${loadaddr} \${rdaddr}:\${rdsize} \${fdtaddr}] ... ; bootz \${loadaddr} \${rdaddr}:\${rdsize} \${fdtaddr};" >> ${wfile}
+		fi
+
 		echo "" >> ${wfile}
 
 		wfile="${TEMPDIR}/disk/nfs-uEnv.txt"
@@ -854,6 +939,35 @@ populate_rootfs () {
 		fi
 	fi
 
+	if [ "x${option_ro_root}" = "xenable" ] ; then
+
+		if [ ! -d ${TEMPDIR}/disk/var ] ; then
+			mkdir -p ${TEMPDIR}/disk/var
+		fi
+
+		if ! mount -t ${ROOTFS_TYPE} ${media_prefix}${media_rootfs_var_partition} ${TEMPDIR}/disk/var; then
+
+			echo "-----------------------------"
+			echo "BUG: [${media_prefix}${media_rootfs_var_partition}] was not available so trying to mount again in 5 seconds..."
+			partprobe ${media}
+			sync
+			sleep 5
+			echo "-----------------------------"
+
+			if ! mount -t ${ROOTFS_TYPE} ${media_prefix}${media_rootfs_var_partition} ${TEMPDIR}/disk/var; then
+				echo "-----------------------------"
+				echo "Unable to mount ${media_prefix}${media_rootfs_var_partition} at ${TEMPDIR}/disk/var to complete populating rootfs Partition"
+				echo "Please retry running the script, sometimes rebooting your system helps."
+				echo "-----------------------------"
+				exit
+			fi
+		fi
+
+	fi
+
+	lsblk | grep -v sr0
+	echo "-----------------------------"
+
 	if [ -f "${DIR}/${ROOTFS}" ] ; then
 		if which pv > /dev/null ; then
 			pv "${DIR}/${ROOTFS}" | tar --numeric-owner --preserve-permissions -xf - -C ${TEMPDIR}/disk/
@@ -887,6 +1001,27 @@ populate_rootfs () {
 		echo "dtb=${dtb}" >> ${wfile}
 	else
 		echo "#dtb=" >> ${wfile}
+
+		if [ "x${conf_board}" = "xam335x_boneblack" ] || [ "x${conf_board}" = "xam335x_evm" ] ; then
+			echo "" >> ${wfile}
+			echo "##BeagleBone Black dtb's for v4.1.x (BeagleBone White just works..)" >> ${wfile}
+
+			echo "" >> ${wfile}
+			echo "##HDMI/eMMC disabled:" >> ${wfile}
+			echo "#dtb=am335x-boneblack-overlay.dtb" >> ${wfile}
+
+			echo "" >> ${wfile}
+			echo "##cape-universal" >> ${wfile}
+			echo "#dtb=am335x-boneblack-universal.dtb" >> ${wfile}
+
+			echo "" >> ${wfile}
+			echo "##wl1835" >> ${wfile}
+			echo "#dtb=am335x-boneblack-wl1835mod.dtb" >> ${wfile}
+
+			echo "" >> ${wfile}
+			echo "##replicape" >> ${wfile}
+			echo "#dtb=am335x-boneblack-replicape.dtb" >> ${wfile}
+		fi
 	fi
 
 	if [ ! "x${rootfs_uuid}" = "x" ] ; then
@@ -894,7 +1029,7 @@ populate_rootfs () {
 		echo "" >> ${wfile}
 	fi
 
-	cmdline="quiet consoleblank=0 fbcon=rotate:1"
+	cmdline="coherent_pool=1M quiet consoleblank=0 fbcon=rotate:1"
 	if [ "x${enable_systemd}" = "xenabled" ] ; then
 		cmdline="${cmdline} init=/lib/systemd/systemd"
 	fi
@@ -917,9 +1052,14 @@ populate_rootfs () {
 	fi
 
 	if [ "x${conf_board}" = "xam335x_boneblack" ] || [ "x${conf_board}" = "xam335x_evm" ] ; then
-		echo "##Example" >> ${wfile}
+		echo "##Example v3.8.x" >> ${wfile}
 		echo "#cape_disable=capemgr.disable_partno=" >> ${wfile}
 		echo "#cape_enable=capemgr.enable_partno=" >> ${wfile}
+		echo "" >> ${wfile}
+
+		echo "##Example v4.1.x" >> ${wfile}
+		echo "#cape_disable=bone_capemgr.disable_partno=" >> ${wfile}
+		echo "#cape_enable=bone_capemgr.enable_partno=" >> ${wfile}
 		echo "" >> ${wfile}
 
 		if [ ! "x${has_post_uenvtxt}" = "x" ] ; then
@@ -962,7 +1102,18 @@ populate_rootfs () {
 		echo "#" >> ${wfile}
 		echo "# Auto generated by RootStock-NG: setup_sdcard.sh" >> ${wfile}
 		echo "#" >> ${wfile}
-		echo "${rootfs_drive}  /  ${ROOTFS_TYPE}  noatime,errors=remount-ro  0  1" >> ${wfile}
+
+		if [ "x${option_ro_root}" = "xenable" ] ; then
+			echo "#With read only rootfs, we need to boot once as rw..." >> ${wfile}
+			echo "${rootfs_drive}  /  ext2  noatime,errors=remount-ro  0  1" >> ${wfile}
+			echo "#" >> ${wfile}
+			echo "#Switch to read only rootfs:" >> ${wfile}
+			echo "#${rootfs_drive}  /  ext2  noatime,ro,errors=remount-ro  0  1" >> ${wfile}
+			echo "#" >> ${wfile}
+			echo "${rootfs_var_drive}  /var  ${ROOTFS_TYPE}  noatime  0  2" >> ${wfile}
+		else
+			echo "${rootfs_drive}  /  ${ROOTFS_TYPE}  noatime,errors=remount-ro  0  1" >> ${wfile}
+		fi
 
 		echo "debugfs  /sys/kernel/debug  debugfs  defaults  0  0" >> ${wfile}
 
@@ -1039,16 +1190,18 @@ populate_rootfs () {
 		echo "" >> ${wfile}
 
 		echo "# Ethernet/RNDIS gadget (g_ether)" >> ${wfile}
-		echo "# ... or on host side, usbnet and random hwaddr" >> ${wfile}
-		echo "# Note on some boards, usb0 is automaticly setup with an init script" >> ${wfile}
+		echo "# Used by: /opt/scripts/boot/autoconfigure_usb0.sh" >> ${wfile}
 		echo "iface usb0 inet static" >> ${wfile}
 		echo "    address 192.168.7.2" >> ${wfile}
-		echo "    netmask 255.255.255.0" >> ${wfile}
+		echo "    netmask 255.255.255.252" >> ${wfile}
 		echo "    network 192.168.7.0" >> ${wfile}
 		echo "    gateway 192.168.7.1" >> ${wfile}
 
 		if [ ! "x${bborg_production}" = "xenable" ] ; then
+			#wheezy
 			rm -f ${TEMPDIR}/disk/var/www/index.html || true
+			#jessie
+			rm -f ${TEMPDIR}/disk/var/www/html/index.html || true
 		fi
 		sync
 
@@ -1065,15 +1218,17 @@ populate_rootfs () {
 		cp -v ${TEMPDIR}/dl/${SPL} ${TEMPDIR}/disk/opt/backup/uboot/${spl_uboot_name}
 	fi
 
-	file="/etc/udev/rules.d/60-omap-tty.rules"
-	echo "#from: http://arago-project.org/git/meta-ti.git?a=commit;h=4ce69eff28103778508d23af766e6204c95595d3" > ${TEMPDIR}/disk${file}
-	echo "" > ${TEMPDIR}/disk${file}
-	echo "# Backward compatibility with old OMAP UART-style ttyO0 naming" > ${TEMPDIR}/disk${file}
-	echo "" >> ${TEMPDIR}/disk${file}
-	echo "SUBSYSTEM==\"tty\", ATTR{uartclk}!=\"0\", KERNEL==\"ttyS[0-9]\", SYMLINK+=\"ttyO%n\"" >> ${TEMPDIR}/disk${file}
-	echo "" >> ${TEMPDIR}/disk${file}
+	if [ ! -f ${TEMPDIR}/etc/udev/rules.d/60-omap-tty.rules ] ; then
+		file="/etc/udev/rules.d/60-omap-tty.rules"
+		echo "#from: http://arago-project.org/git/meta-ti.git?a=commit;h=4ce69eff28103778508d23af766e6204c95595d3" > ${TEMPDIR}/disk${file}
+		echo "" > ${TEMPDIR}/disk${file}
+		echo "# Backward compatibility with old OMAP UART-style ttyO0 naming" > ${TEMPDIR}/disk${file}
+		echo "" >> ${TEMPDIR}/disk${file}
+		echo "SUBSYSTEM==\"tty\", ATTR{uartclk}!=\"0\", KERNEL==\"ttyS[0-9]\", SYMLINK+=\"ttyO%n\"" >> ${TEMPDIR}/disk${file}
+		echo "" >> ${TEMPDIR}/disk${file}
+	fi
 
-	if [ "x${conf_board}" = "xam335x_boneblack" ] || [ "x${conf_board}" = "xam335x_evm" ] ; then
+	if [ "x${conf_board}" = "xam335x_boneblack" ] || [ "x${conf_board}" = "xam335x_evm" ] || [ "x${conf_board}" = "xarduino-tre" ] ; then
 
 		file="/etc/udev/rules.d/70-persistent-net.rules"
 		echo "" > ${TEMPDIR}/disk${file}
@@ -1145,6 +1300,10 @@ populate_rootfs () {
 	sync
 	sync
 	cd "${DIR}/"
+
+	if [ "x${option_ro_root}" = "xenable" ] ; then
+		umount ${TEMPDIR}/disk/var || true
+	fi
 
 	umount ${TEMPDIR}/disk || true
 	if [ "x${build_img_file}" = "xenable" ] ; then
@@ -1336,6 +1495,10 @@ while [ ! -z "$1" ] ; do
 		dir_check="${DIR}/"
 		kernel_detection
 		check_dtb_board
+		;;
+	--ro)
+		conf_var_startmb="2048"
+		option_ro_root="enable"
 		;;
 	--rootfs)
 		checkparm $2
