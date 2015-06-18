@@ -102,57 +102,6 @@ setup_system () {
 	fi
 }
 
-
-
-install_pip_pkgs () {
-	if [ -f /usr/bin/pip ] ; then
-		echo "Installing pip packages"
-		#Fixed in git, however not pushed to pip yet...(use git and install)
-		#libpython2.7-dev
-		#pip install Adafruit_BBIO
-
-		git_repo="https://github.com/adafruit/adafruit-beaglebone-io-python.git"
-		git_target_dir="/opt/source/adafruit-beaglebone-io-python"
-		git_clone
-		if [ -f ${git_target_dir}/.git/config ] ; then
-			cd ${git_target_dir}/
-			python setup.py install
-		fi
-	fi
-}
-
-install_git_repos () {
-	git_repo="https://github.com/prpplague/fb-test-app.git"
-	git_target_dir="/opt/source/fb-test-app"
-	git_clone
-	if [ -f ${git_target_dir}/.git/config ] ; then
-		cd ${git_target_dir}/
-		if [ -f /usr/bin/make ] ; then
-			make
-		fi
-	fi
-
-	git_repo="https://github.com/alexanderhiam/PyBBIO.git"
-	git_target_dir="/opt/source/PyBBIO"
-	git_clone
-	if [ -f ${git_target_dir}/.git/config ] ; then
-		cd ${git_target_dir}/
-		if [ -f /usr/bin/dtc ] ; then
-			sed -i "s/PLATFORM = ''/PLATFORM = 'BeagleBone >=3.8'/g" setup.py
-			python setup.py install
-		fi
-	fi
-
-	git_repo="https://github.com/RobertCNelson/dtb-rebuilder.git"
-	git_branch="3.14-ti"
-	git_target_dir="/opt/source/dtb-${git_branch}"
-	git_clone_branch
-
-	git_repo="git://git.ti.com/pru-software-support-package/pru-software-support-package.git"
-	git_target_dir="/opt/source/pru-software-support-package"
-	git_clone
-}
-
 other_source_links () {
 	rcn_https="https://raw.githubusercontent.com/RobertCNelson/Bootloader-Builder/master/patches"
 
@@ -212,14 +161,10 @@ todo () {
 	# Fix the perl langyage bug
 	echo "export LC_ALL=C" >> /etc/profile
 
-	# Make sure depmod -a is run on first boot
-	echo "#!/bin/bash" 				  > /etc/init.d/first_boot
-	echo "#Script run on first boot "		 >> /etc/init.d/first_boot
-	echo "sleep 10" 				 >> /etc/init.d/first_boot
-	echo "depmod -a" 				 >> /etc/init.d/first_boot
-	echo "systemctl restart pvrsrv" 		 >> /etc/init.d/first_boot
-	echo "systemctl restart toggle" 		 >> /etc/init.d/first_boot
-	chmod +x /etc/init.d/first_boot
+    if [ -f /opt/scripts/replicape/first_boot.sh ] ; then
+	    cp /opt/scripts/replicape/first_boot.sh /etc/init.d/first_boot
+	    chmod +x /etc/init.d/first_boot
+    fi
 
 	# Make systemd script
 	echo "[Unit]" 					  > /lib/systemd/system/first-boot.service
@@ -235,30 +180,6 @@ todo () {
 	if [ ! -f /etc/systemd/system/multi-user.target.wants/first-boot.service ] ; then
 		ln -s /lib/systemd/system/first-boot.service /etc/systemd/system/multi-user.target.wants/first-boot.service
 	fi
-
-	# Make folder for octo
-	mkdir -p /home/octo
-	mkdir -p "/home/octo/.octoprint"
-	chown -R octo:octo "/home/octo/.octoprint"
-	
-	# Fix permissions for STL upload folder
-	chown octo:octo /usr/share/models
-	chmod 777 /usr/share/models
-	
-	# Make config file for Octoprint
-	echo "cura:"					 > "/home/octo/.octoprint/config.yaml"
-	echo "  config: /etc/cura/printer.ini"		>> "/home/octo/.octoprint/config.yaml"
-	echo "  enabled: true" 				>> "/home/octo/.octoprint/config.yaml"
-	echo "  path: /usr/share/cura/cura.sh"		>> "/home/octo/.octoprint/config.yaml"
-	echo "folder:"					>> "/home/octo/.octoprint/config.yaml"
-	echo "  uploads: /usr/share/models"		>> "/home/octo/.octoprint/config.yaml"
-	echo "serial:"					>> "/home/octo/.octoprint/config.yaml"
-	echo "  additionalPorts:"			>> "/home/octo/.octoprint/config.yaml"
-	echo "    - /dev/octoprint_1"			>> "/home/octo/.octoprint/config.yaml"
-	echo "  baudrate: 115200"			>> "/home/octo/.octoprint/config.yaml"
-	echo "  port: /dev/octoprint_1"			>> "/home/octo/.octoprint/config.yaml"
-
-	chown octo:octo "/home/octo/.octoprint/config.yaml"
 
 	# Remove local repo from hosts	
 	sed -i "s/10.24.2.241 feeds.thing-printer.com//" /etc/hosts
