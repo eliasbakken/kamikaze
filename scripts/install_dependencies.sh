@@ -22,7 +22,7 @@
 
 #http://ftp.us.debian.org/debian/pool/main/d/debootstrap/
 #1.0.${minimal_debootstrap}
-minimal_debootstrap="70"
+minimal_debootstrap="72"
 host_arch="$(uname -m)"
 
 debootstrap_is_installed () {
@@ -30,8 +30,10 @@ debootstrap_is_installed () {
 	dpkg -l | grep debootstrap >/dev/null || deb_pkgs="${deb_pkgs}debootstrap "
 
 	if [ "x${host_arch}" != "xarmv7l" ] ; then
-		dpkg -l | grep qemu-user-static >/dev/null || deb_pkgs="${deb_pkgs}qemu-user-static "
-		dpkg -l | grep `dpkg --print-architecture` | grep -v "qemu-" | grep qemu >/dev/null || deb_pkgs="${deb_pkgs}qemu "
+		if [ "x${host_arch}" != "xaarch64" ] ; then
+			dpkg -l | grep qemu-user-static >/dev/null || deb_pkgs="${deb_pkgs}qemu-user-static "
+			dpkg -l | grep `dpkg --print-architecture` | grep -v "qemu-" | grep qemu >/dev/null || deb_pkgs="${deb_pkgs}qemu "
+		fi
 	fi
 
 	if [ "${deb_pkgs}" ] ; then

@@ -315,20 +315,24 @@ unmount_all_drive_partitions () {
 
 sfdisk_partition_layout () {
 	sfdisk_options="--force --in-order --Linux --unit M"
+	sfdisk_boot_startmb="${conf_boot_startmb}"
+	sfdisk_boot_endmb="${conf_boot_endmb}"
+	sfdisk_var_startmb="${conf_var_startmb}"
+
 	test_sfdisk=$(LC_ALL=C sfdisk --help | grep -m 1 -e "--in-order" || true)
 	if [ "x${test_sfdisk}" = "x" ] ; then
 		echo "log: sfdisk: 2.26.x or greater detected"
 		sfdisk_options="--force"
-		conf_boot_startmb="${conf_boot_startmb}M"
-		conf_boot_endmb="${conf_boot_endmb}M"
-		conf_var_startmb="${conf_var_startmb}M"
+		sfdisk_boot_startmb="${sfdisk_boot_startmb}M"
+		sfdisk_boot_endmb="${sfdisk_boot_endmb}M"
+		sfdisk_var_startmb="${sfdisk_var_startmb}M"
 	fi
 
 	if [ "x${option_ro_root}" = "xenable" ] ; then
 
 		LC_ALL=C sfdisk ${sfdisk_options} "${media}" <<-__EOF__
-			${conf_boot_startmb},${conf_boot_endmb},${sfdisk_fstype},*
-			,${conf_var_startmb},,-
+			${sfdisk_boot_startmb},${sfdisk_boot_endmb},${sfdisk_fstype},*
+			,${sfdisk_var_startmb},,-
 			,,,-
 		__EOF__
 
@@ -336,7 +340,7 @@ sfdisk_partition_layout () {
 	else
 
 		LC_ALL=C sfdisk ${sfdisk_options} "${media}" <<-__EOF__
-			${conf_boot_startmb},${conf_boot_endmb},${sfdisk_fstype},*
+			${sfdisk_boot_startmb},${sfdisk_boot_endmb},${sfdisk_fstype},*
 			,,,-
 		__EOF__
 
@@ -347,18 +351,21 @@ sfdisk_partition_layout () {
 
 sfdisk_single_partition_layout () {
 	sfdisk_options="--force --in-order --Linux --unit M"
+	sfdisk_boot_startmb="${conf_boot_startmb}"
+	sfdisk_var_startmb="${conf_var_startmb}"
+
 	test_sfdisk=$(LC_ALL=C sfdisk --help | grep -m 1 -e "--in-order" || true)
 	if [ "x${test_sfdisk}" = "x" ] ; then
 		echo "log: sfdisk: 2.26.x or greater detected"
 		sfdisk_options="--force"
-		conf_boot_startmb="${conf_boot_startmb}M"
-		conf_var_startmb="${conf_var_startmb}M"
+		sfdisk_boot_startmb="${sfdisk_boot_startmb}M"
+		sfdisk_var_startmb="${sfdisk_var_startmb}M"
 	fi
 
 	if [ "x${option_ro_root}" = "xenable" ] ; then
 
 		LC_ALL=C sfdisk ${sfdisk_options} "${media}" <<-__EOF__
-			${conf_boot_startmb},${conf_var_startmb},${sfdisk_fstype},*
+			${sfdisk_boot_startmb},${sfdisk_var_startmb},${sfdisk_fstype},*
 			,,,-
 		__EOF__
 
@@ -366,7 +373,7 @@ sfdisk_single_partition_layout () {
 	else
 
 		LC_ALL=C sfdisk ${sfdisk_options} "${media}" <<-__EOF__
-			${conf_boot_startmb},,${sfdisk_fstype},*
+			${sfdisk_boot_startmb},,${sfdisk_fstype},*
 		__EOF__
 
 	fi
@@ -996,6 +1003,11 @@ populate_rootfs () {
 		echo "uname_r=${kernel_override}" >> ${wfile}
 	fi
 
+	if [ ! "x${rootfs_uuid}" = "x" ] ; then
+		echo "uuid=${rootfs_uuid}" >> ${wfile}
+	else
+		echo "#uuid=" >> ${wfile}
+	fi
 	dtb="am335x-boneblack-replicape.dtb"
 	if [ ! "x${dtb}" = "x" ] ; then
 		echo "dtb=${dtb}" >> ${wfile}
@@ -1004,32 +1016,41 @@ populate_rootfs () {
 
 		if [ "x${conf_board}" = "xam335x_boneblack" ] || [ "x${conf_board}" = "xam335x_evm" ] ; then
 			echo "" >> ${wfile}
-			echo "##BeagleBone Black dtb's for v4.1.x (BeagleBone White just works..)" >> ${wfile}
+			echo "##BeagleBone Black/Green dtb's for v4.1.x (BeagleBone White just works..)" >> ${wfile}
 
 			echo "" >> ${wfile}
-			echo "##HDMI/eMMC disabled:" >> ${wfile}
+			echo "##BeagleBone Black: HDMI (Audio/Video) disabled:" >> ${wfile}
+			echo "#dtb=am335x-boneblack-emmc-overlay.dtb" >> ${wfile}
+
+			echo "" >> ${wfile}
+			echo "##BeagleBone Black: eMMC disabled:" >> ${wfile}
+			echo "#dtb=am335x-boneblack-hdmi-overlay.dtb" >> ${wfile}
+
+			echo "" >> ${wfile}
+			echo "##BeagleBone Black: HDMI Audio/eMMC disabled:" >> ${wfile}
+			echo "#dtb=am335x-boneblack-nhdmi-overlay.dtb" >> ${wfile}
+
+			echo "" >> ${wfile}
+			echo "##BeagleBone Black: HDMI (Audio/Video)/eMMC disabled:" >> ${wfile}
 			echo "#dtb=am335x-boneblack-overlay.dtb" >> ${wfile}
 
 			echo "" >> ${wfile}
-			echo "##cape-universal" >> ${wfile}
-			echo "#dtb=am335x-boneblack-universal.dtb" >> ${wfile}
-
-			echo "" >> ${wfile}
-			echo "##wl1835" >> ${wfile}
+			echo "##BeagleBone Black: wl1835" >> ${wfile}
 			echo "#dtb=am335x-boneblack-wl1835mod.dtb" >> ${wfile}
 
 			echo "" >> ${wfile}
-			echo "##replicape" >> ${wfile}
+			echo "##BeagleBone Black: replicape" >> ${wfile}
 			echo "#dtb=am335x-boneblack-replicape.dtb" >> ${wfile}
+
+			echo "" >> ${wfile}
+			echo "##BeagleBone Green: eMMC disabled" >> ${wfile}
+			echo "#dtb=am335x-bonegreen-overlay.dtb" >> ${wfile}
+
+			echo "" >> ${wfile}
 		fi
 	fi
 
-	if [ ! "x${rootfs_uuid}" = "x" ] ; then
-		echo "uuid=${rootfs_uuid}" >> ${wfile}
-		echo "" >> ${wfile}
-	fi
-
-	cmdline="coherent_pool=1M quiet consoleblank=0 fbcon=rotate:1"
+	cmdline="coherent_pool=1M quiet"
 	if [ "x${enable_systemd}" = "xenabled" ] ; then
 		cmdline="${cmdline} init=/lib/systemd/systemd"
 	fi
@@ -1067,7 +1088,9 @@ populate_rootfs () {
 			echo "" >> ${wfile}
 		fi
 
-		if [ "x${bbb_flasher}" = "xenable" ] ; then
+		if [ "x${usb_flasher}" = "xenable" ] ; then
+			echo "cmdline=init=/opt/scripts/tools/eMMC/init-eMMC-flasher-from-usb-media.sh" >> ${wfile}
+		elif [ "x${bbb_flasher}" = "xenable" ] ; then
 			echo "##enable BBB: eMMC Flasher:" >> ${wfile}
 			echo "cmdline=init=/opt/scripts/tools/eMMC/init-eMMC-flasher-v3.sh consoleblank=0 fbcon=rotate:1" >> ${wfile}
 		elif [ "x${bbg_flasher}" = "xenable" ] ; then
@@ -1079,6 +1102,10 @@ populate_rootfs () {
 			echo "#cmdline=init=/opt/scripts/tools/eMMC/init-eMMC-flasher-v3.sh" >> ${wfile}
 		fi
 		echo "" >> ${wfile}
+	else
+		if [ "x${usb_flasher}" = "xenable" ] ; then
+			echo "cmdline=init=/opt/scripts/tools/eMMC/init-eMMC-flasher-from-usb-media.sh" >> ${wfile}
+		fi
 	fi
 
 	#am335x_boneblack is a custom u-boot to ignore empty factory eeproms...
@@ -1240,20 +1267,9 @@ populate_rootfs () {
 		echo "" >> ${TEMPDIR}/disk${file}
 	fi
 
-	if [ -f ${TEMPDIR}/disk/etc/dnsmasq.conf ] ; then
-		wfile="/etc/dnsmasq.d/usb0-dhcp"
-		echo "#disable DNS by setting port to 0" > ${TEMPDIR}/disk${wfile}
-		echo "port=0" >> ${TEMPDIR}/disk${wfile}
-		echo "" >> ${TEMPDIR}/disk${wfile}
-		echo "interface=usb0" >> ${TEMPDIR}/disk${wfile}
-		echo "#one address range" >> ${TEMPDIR}/disk${wfile}
-		echo "dhcp-range=192.168.7.1,192.168.7.1" >> ${TEMPDIR}/disk${wfile}
-		echo "" >> ${TEMPDIR}/disk${wfile}
-		echo "dhcp-option=3" >> ${TEMPDIR}/disk${wfile}
-	fi
-
 	if [ ! -f ${TEMPDIR}/disk/opt/scripts/boot/generic-startup.sh ] ; then
 		git clone https://github.com/eliasbakken/boot-scripts ${TEMPDIR}/disk/opt/scripts/ --depth 1
+		sudo chown -R 1000:1000 ${TEMPDIR}/disk/opt/scripts/
 	fi
 
 	if [ "x${drm}" = "xomapdrm" ] ; then
@@ -1265,6 +1281,7 @@ populate_rootfs () {
 			if [ "x${conf_board}" = "xomap3_beagle" ] ; then
 				sudo sed -i -e 's:#HWcursor_false::g' ${TEMPDIR}/disk${wfile}
 			else
+				sudo sed -i -e 's:#HWcursor_false::g' ${TEMPDIR}/disk${wfile}
 				sudo sed -i -e 's:16:24:g' ${TEMPDIR}/disk${wfile}
 			fi
 		fi
@@ -1487,7 +1504,19 @@ while [ ! -z "$1" ] ; do
 			rm -rf "${media}" || true
 		fi
 		#FIXME: (should fit most microSD cards)
-		dd if=/dev/zero of="${media}" bs=1024 count=0 seek=$((1024 * (700 + (gsize - 1) * 1000)))
+		#eMMC: (dd if=/dev/mmcblk1 of=/dev/null bs=1M #MB)
+		#Micron   3744MB (bbb): 3925868544 bytes -> 3925.86 Megabyte
+		#Kingston 3688MB (bbb): 3867148288 bytes -> 3867.15 Megabyte
+		#Kingston 3648MB (x15): 3825205248 bytes -> 3825.21 Megabyte (3648)
+		#
+		### seek=$((1024 * (700 + (gsize - 1) * 1000)))
+		## 1000 1GB = 700 #2GB = 1700 #4GB = 3700
+		##  990 1GB = 700 #2GB = 1690 #4GB = 3670
+		#
+		### seek=$((1024 * (gsize * 850)))
+		## x 850 (85%) #1GB = 850 #2GB = 1700 #4GB = 3400
+		#
+		dd if=/dev/zero of="${media}" bs=1024 count=0 seek=$((1024 * (gsize * 850)))
 		;;
 	--dtb)
 		checkparm $2
@@ -1530,6 +1559,9 @@ while [ ! -z "$1" ] ; do
 		;;
 	--bbg-flasher)
 		bbg_flasher="enable"
+		;;
+	--bbb-usb-flasher|--usb-flasher)
+		usb_flasher="enable"
 		;;
 	--beagleboard.org-production)
 		bborg_production="enable"

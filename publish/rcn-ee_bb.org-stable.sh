@@ -16,11 +16,13 @@ fi
 ./RootStock-NG.sh -c bb.org-debian-jessie-lxqt-2gb-v4.1
 ./RootStock-NG.sh -c bb.org-debian-jessie-lxqt-4gb-v4.1
 ./RootStock-NG.sh -c bb.org-debian-jessie-console-v4.1
+./RootStock-NG.sh -c bb.org-debian-jessie-usbflasher
 
 debian_wheezy_machinekit="debian-7.8-machinekit-armhf-${time}"
 debian_jessie_lxqt_2gb="debian-8.1-lxqt-2gb-armhf-${time}"
 debian_jessie_lxqt_4gb="debian-8.1-lxqt-4gb-armhf-${time}"
 debian_jessie_console="debian-8.1-console-armhf-${time}"
+debian_jessie_usbflasher="debian-8.1-usbflasher-armhf-${time}"
 
 archive="xz -z -8 -v"
 
@@ -100,10 +102,14 @@ copy_img_to_mirror () {
 
 archive_img () {
         if [ -f \${wfile}.img ] ; then
-                if [ -f /usr/bin/bmaptool ] ; then
-                        bmaptool create -o \${wfile}.bmap \${wfile}.img
+                if [ ! -f \${wfile}.bmap ] ; then
+                        if [ -f /usr/bin/bmaptool ] ; then
+                                bmaptool create -o \${wfile}.bmap \${wfile}.img
+                        fi
                 fi
-                ${archive} \${wfile}.img
+                if [ ! -f \${wfile}.img.xz ] ; then
+                        ${archive} \${wfile}.img
+                fi
                 copy_img_to_mirror
         fi
 }
@@ -138,19 +144,25 @@ options="--img-2gb BBB-eMMC-flasher-\${base_rootfs} ${beaglebone} --bbb-flasher"
 ###console images: (also single partition)
 base_rootfs="${debian_jessie_console}" ; blend="console" ; extract_base_rootfs
 
-options="--img-2gb BBG-blank-eMMC-flasher-\${base_rootfs} ${bb_blank_flasher_console} --bbg-flasher" ; generate_img
-options="--img-2gb BBB-blank-eMMC-flasher-\${base_rootfs} ${bb_blank_flasher_console} --bbb-flasher" ; generate_img
+#options="--img-2gb BBG-blank-eMMC-flasher-\${base_rootfs} ${bb_blank_flasher_console} --bbg-flasher" ; generate_img
+#options="--img-2gb BBB-blank-eMMC-flasher-\${base_rootfs} ${bb_blank_flasher_console} --bbb-flasher" ; generate_img
 options="--img-2gb BBB-eMMC-flasher-\${base_rootfs} ${beaglebone_console} --bbb-flasher" ; generate_img
 options="--img-2gb bb-\${base_rootfs} ${omap3_beagle_xm}" ; generate_img
 options="--img-2gb bbx15-\${base_rootfs} ${am57xx_beagle_x15}" ; generate_img
 options="--img-2gb bone-\${base_rootfs} ${beaglebone_console}" ; generate_img
 options="--img-2gb omap5-uevm-\${base_rootfs} ${omap5_uevm}" ; generate_img
 
+###usbflasher images: (also single partition)
+base_rootfs="${debian_jessie_usbflasher}" ; blend="usbflasher" ; extract_base_rootfs
+options="--img-2gb BBB-blank-\${base_rootfs} --dtb bbb-blank-eeprom --bbb-old-bootloader-in-emmc --hostname beaglebone --usb-flasher" ; generate_img
+options="--img-2gb bbx15-\${base_rootfs} --dtb am57xx-beagle-x15 --hostname BeagleBoard-X15 --usb-flasher" ; generate_img
+
 ###archive *.tar
 base_rootfs="${debian_wheezy_machinekit}" ; blend="machinekit" ; archive_base_rootfs
 base_rootfs="${debian_jessie_lxqt_4gb}" ; blend="lxqt-4gb" ; archive_base_rootfs
 base_rootfs="${debian_jessie_lxqt_2gb}" ; blend="lxqt-2gb" ; archive_base_rootfs
 base_rootfs="${debian_jessie_console}" ; blend="console" ; archive_base_rootfs
+base_rootfs="${debian_jessie_usbflasher}" ; blend="usbflasher" ; archive_base_rootfs
 
 ###archive *.img
 blend="machinekit"
@@ -168,13 +180,17 @@ blend="lxqt-2gb"
 wfile="BBB-eMMC-flasher-${debian_jessie_lxqt_2gb}-2gb" ; archive_img
 
 blend="console"
-wfile="BBB-blank-eMMC-flasher-${debian_jessie_console}-2gb" ; archive_img
-wfile="BBG-blank-eMMC-flasher-${debian_jessie_console}-2gb" ; archive_img
+#wfile="BBB-blank-eMMC-flasher-${debian_jessie_console}-2gb" ; archive_img
+#wfile="BBG-blank-eMMC-flasher-${debian_jessie_console}-2gb" ; archive_img
 wfile="BBB-eMMC-flasher-${debian_jessie_console}-2gb" ; archive_img
 wfile="bb-${debian_jessie_console}-2gb" ; archive_img
 wfile="bbx15-${debian_jessie_console}-2gb" ; archive_img
 wfile="bone-${debian_jessie_console}-2gb" ; archive_img
 wfile="omap5-uevm-${debian_jessie_console}-2gb" ; archive_img
+
+blend="usbflasher"
+wfile="BBB-blank-${debian_jessie_usbflasher}-2gb" ; archive_img
+wfile="bbx15-${debian_jessie_usbflasher}-2gb" ; archive_img
 
 __EOF__
 

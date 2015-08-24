@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 time=$(date +%Y-%m-%d)
-mirror_dir="/var/www/html/rcn-ee.net/rootfs/bb.org/testing"
+mirror_dir="/var/www/html/rcn-ee.net/rootfs/bb.org/release"
 DIR="$PWD"
 
 git pull --no-edit https://github.com/beagleboard/image-builder master
@@ -79,16 +79,26 @@ copy_img_to_mirror () {
                         mkdir -p ${mirror_dir}/${time}/\${blend}/ || true
                 fi
                 if [ -d ${mirror_dir}/${time}/\${blend}/ ] ; then
-                        if [ -f \${wfile}.xz ] ; then
-                                cp -v \${wfile}.xz ${mirror_dir}/${time}/\${blend}/
+                        if [ -f \${wfile}.bmap ] ; then
+                                cp -v \${wfile}.bmap ${mirror_dir}/${time}/\${blend}/
+                        fi
+                        if [ -f \${wfile}.img.xz ] ; then
+                                cp -v \${wfile}.img.xz ${mirror_dir}/${time}/\${blend}/
                         fi
                 fi
         fi
 }
 
 archive_img () {
-        if [ -f \${wfile} ] ; then
-                ${archive} \${wfile}
+        if [ -f \${wfile}.img ] ; then
+                if [ ! -f \${wfile}.bmap ] ; then
+                        if [ -f /usr/bin/bmaptool ] ; then
+                                bmaptool create -o \${wfile}.bmap \${wfile}.img
+                        fi
+                fi
+                if [ ! -f \${wfile}.img.xz ] ; then
+                        ${archive} \${wfile}.img
+                fi
                 copy_img_to_mirror
         fi
 }
@@ -127,18 +137,18 @@ base_rootfs="${debian_wheezy_console}" ; blend="console" ; archive_base_rootfs
 
 ###archive *.img
 blend="lxde-4gb"
-wfile="BBB-blank-eMMC-flasher-${debian_wheezy_lxde_4gb}-4gb.img" ; archive_img
-wfile="BBG-blank-eMMC-flasher-${debian_wheezy_lxde_4gb}-4gb.img" ; archive_img
-wfile="BBB-eMMC-flasher-${debian_wheezy_lxde_4gb}-4gb.img" ; archive_img
-wfile="bone-${debian_wheezy_lxde_4gb}-4gb.img" ; archive_img
+wfile="BBB-blank-eMMC-flasher-${debian_wheezy_lxde_4gb}-4gb" ; archive_img
+wfile="BBG-blank-eMMC-flasher-${debian_wheezy_lxde_4gb}-4gb" ; archive_img
+wfile="BBB-eMMC-flasher-${debian_wheezy_lxde_4gb}-4gb" ; archive_img
+wfile="bone-${debian_wheezy_lxde_4gb}-4gb" ; archive_img
 
 blend="lxde"
-wfile="BBB-eMMC-flasher-${debian_wheezy_lxde_2gb}-2gb.img" ; archive_img
+wfile="BBB-eMMC-flasher-${debian_wheezy_lxde_2gb}-2gb" ; archive_img
 
 blend="console"
-wfile="BBB-blank-eMMC-flasher-${debian_wheezy_console}-2gb.img" ;archive_img
-wfile="BBB-eMMC-flasher-${debian_wheezy_console}-2gb.img" ; archive_img
-wfile="bone-${debian_wheezy_console}-2gb.img" ; archive_img
+wfile="BBB-blank-eMMC-flasher-${debian_wheezy_console}-2gb" ;archive_img
+wfile="BBB-eMMC-flasher-${debian_wheezy_console}-2gb" ; archive_img
+wfile="bone-${debian_wheezy_console}-2gb" ; archive_img
 
 __EOF__
 

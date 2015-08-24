@@ -23,8 +23,8 @@
 export LC_ALL=C
 
 chromium_release="chromium-33.0.1750.117"
-u_boot_release="v2015.07-rc2"
-bone101_git_sha="53fde450735a331963d337576239bae4c81c32fb"
+u_boot_release="v2015.07"
+#bone101_git_sha="50e01966e438ddc43b9177ad4e119e5274a0130d"
 
 #contains: rfs_username, release_date
 if [ -f /etc/rcn-ee.conf ] ; then
@@ -250,10 +250,7 @@ install_node_pkgs () {
 
 		if [ -f /usr/bin/make ] ; then
 			echo "Installing bonescript"
-			TERM=dumb npm install -g bonescript --arch=armhf
-			if [ -f /usr/local/lib/node_modules/bonescript/server.js ] ; then
-				sed -i -e 's:/usr/share/bone101:/var/lib/cloud9:g' /usr/local/lib/node_modules/bonescript/server.js
-			fi
+			TERM=dumb npm install -g bonescript@0.2.5
 		fi
 
 		cd /opt/

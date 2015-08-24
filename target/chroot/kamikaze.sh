@@ -22,7 +22,7 @@
 
 export LC_ALL=C
 
-u_boot_release="v2015.01"
+u_boot_release="v2015.07"
 
 #contains: rfs_username, release_date
 if [ -f /etc/rcn-ee.conf ] ; then
@@ -53,33 +53,6 @@ qemu_warning () {
 	fi
 }
 
-git_clone () {
-	mkdir -p ${git_target_dir} || true
-	qemu_command="git clone ${git_repo} ${git_target_dir} --depth 1 || true"
-	qemu_warning
-	git clone ${git_repo} ${git_target_dir} --depth 1 || true
-	sync
-	echo "${git_target_dir} : ${git_repo}" >> /opt/source/list.txt
-}
-
-git_clone_branch () {
-	mkdir -p ${git_target_dir} || true
-	qemu_command="git clone -b ${git_branch} ${git_repo} ${git_target_dir} --depth 1 || true"
-	qemu_warning
-	git clone -b ${git_branch} ${git_repo} ${git_target_dir} --depth 1 || true
-	sync
-	echo "${git_target_dir} : ${git_repo}" >> /opt/source/list.txt
-}
-
-git_clone_full () {
-	mkdir -p ${git_target_dir} || true
-	qemu_command="git clone ${git_repo} ${git_target_dir} || true"
-	qemu_warning
-	git clone ${git_repo} ${git_target_dir} || true
-	sync
-	echo "${git_target_dir} : ${git_repo}" >> /opt/source/list.txt
-}
-
 setup_system () {
 	#For when sed/grep/etc just gets way to complex...
 	cd /
@@ -103,9 +76,10 @@ setup_system () {
 }
 
 other_source_links () {
-	rcn_https="https://raw.githubusercontent.com/RobertCNelson/Bootloader-Builder/master/patches"
+	rcn_https="https://rcn-ee.com/repos/git/u-boot-patches"
 
 	mkdir -p /opt/source/u-boot_${u_boot_release}/
+	wget --directory-prefix="/opt/source/u-boot_${u_boot_release}/" ${rcn_https}/${u_boot_release}/0001-omap3_beagle-uEnv.txt-bootz-n-fixes.patch
 	wget --directory-prefix="/opt/source/u-boot_${u_boot_release}/" ${rcn_https}/${u_boot_release}/0001-am335x_evm-uEnv.txt-bootz-n-fixes.patch
 	wget --directory-prefix="/opt/source/u-boot_${u_boot_release}/" ${rcn_https}/${u_boot_release}/0001-beagle_x15-uEnv.txt-bootz-n-fixes.patch
 
@@ -131,72 +105,33 @@ unsecure_root () {
 }
 
 
-
-install_adafruit(){
-	cd /usr/src/
-	wget https://github.com/eliasbakken/adafruit-beaglebone-io-python/archive/master.tar.gz
-	mv master.tar.gz Adafruit_BBIO.tar.gz
-	tar xf Adafruit_BBIO.tar.gz
-	cd adafruit-beaglebone-io-python-master
-	python setup.py install
-}
-
 todo () {
 	#stuff i need to package in repos.rcn-ee.com
 	#
-	cd /
-	if [ ! -f /etc/Wireless/RT2870STA/RT2870STA.dat ] ; then
-		mkdir -p /etc/Wireless/RT2870STA/
-		cd /etc/Wireless/RT2870STA/
-		wget https://raw.githubusercontent.com/rcn-ee/mt7601u/master/src/RT2870STA.dat
+    is_kernel=$(echo ${repo_rcnee_pkg_version} | grep 4.1)
+	if [ ! "x${is_kernel}" = "x" ] ; then
 		cd /
-	fi
-	if [ ! -f /etc/modules-load.d/mt7601.conf ] ; then
-		echo "mt7601Usta" > /etc/modules-load.d/mt7601.conf
+		if [ ! -f /etc/Wireless/RT2870STA/RT2870STA.dat ] ; then
+			mkdir -p /etc/Wireless/RT2870STA/
+			cd /etc/Wireless/RT2870STA/
+			wget https://raw.githubusercontent.com/rcn-ee/mt7601u/master/src/RT2870STA.dat
+			cd /
+		fi
+		if [ ! -f /etc/modules-load.d/mt7601.conf ] ; then
+			echo "mt7601Usta" > /etc/modules-load.d/mt7601.conf
+		fi
 	fi
 
-	# Make i2c load at boot
-	echo "i2c-dev" >> /etc/modules
 
-	# Fix the perl langyage bug
+	# Fix the perl language bug
 	echo "export LC_ALL=C" >> /etc/profile
-
-    if [ -f /opt/scripts/replicape/first_boot.sh ] ; then
-	    cp /opt/scripts/replicape/first_boot.sh /etc/init.d/first_boot
-	    chmod +x /etc/init.d/first_boot
-    fi
-
-	# Make systemd script
-	echo "[Unit]" 					  > /lib/systemd/system/first-boot.service
-	echo "Description=depmod -a on first run"	 >> /lib/systemd/system/first-boot.service
-	echo ""	 					 >> /lib/systemd/system/first-boot.service
-	echo "[Service]"				 >> /lib/systemd/system/first-boot.service
-	echo "ExecStart=/etc/init.d/first_boot"		 >> /lib/systemd/system/first-boot.service
-	echo "ExecStartPost=/bin/systemctl mask first-boot" >> /lib/systemd/system/first-boot.service
- 	echo ""						 >> /lib/systemd/system/first-boot.service
-	echo "[Install]"				 >> /lib/systemd/system/first-boot.service
-	echo "WantedBy=multi-user.target"		 >> /lib/systemd/system/first-boot.service
-
-	if [ ! -f /etc/systemd/system/multi-user.target.wants/first-boot.service ] ; then
-		ln -s /lib/systemd/system/first-boot.service /etc/systemd/system/multi-user.target.wants/first-boot.service
-	fi
-
-	# Remove local repo from hosts	
-	sed -i "s/10.24.2.241 feeds.thing-printer.com//" /etc/hosts
 }
 
 
 is_this_qemu
-
 setup_system
-#if [ -f /usr/bin/git ] ; then
-#	install_git_repos
-#fi
 other_source_links
 unsecure_root
-
-install_adafruit
-
 todo
 
 

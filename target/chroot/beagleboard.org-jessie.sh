@@ -22,8 +22,8 @@
 
 export LC_ALL=C
 
-u_boot_release="v2015.07-rc2"
-bone101_git_sha="53fde450735a331963d337576239bae4c81c32fb"
+u_boot_release="v2015.07"
+#bone101_git_sha="50e01966e438ddc43b9177ad4e119e5274a0130d"
 
 #contains: rfs_username, release_date
 if [ -f /etc/rcn-ee.conf ] ; then
@@ -200,6 +200,38 @@ setup_desktop () {
 	fi
 }
 
+install_gem_pkgs () {
+	if [ -f /usr/bin/gem ] ; then
+		echo "Installing gem packages"
+		echo "debug: gem: [`gem --version`]"
+		gem_wheezy="--no-rdoc --no-ri"
+		gem_jessie="--no-document"
+
+		echo "gem: [beaglebone]"
+		gem install beaglebone || true
+
+		echo "gem: [jekyll ${gem_jessie}]"
+		gem install jekyll ${gem_jessie} || true
+	fi
+}
+
+install_pip_pkgs () {
+	if [ -f /usr/bin/pip ] ; then
+		echo "Installing pip packages"
+		#Fixed in git, however not pushed to pip yet...(use git and install)
+		#libpython2.7-dev
+		#pip install Adafruit_BBIO
+
+		git_repo="https://github.com/adafruit/adafruit-beaglebone-io-python.git"
+		git_target_dir="/opt/source/adafruit-beaglebone-io-python"
+		git_clone
+		if [ -f ${git_target_dir}/.git/config ] ; then
+			cd ${git_target_dir}/
+			python setup.py install
+		fi
+	fi
+}
+
 cleanup_npm_cache () {
 	if [ -d /root/tmp/ ] ; then
 		rm -rf /root/tmp/ || true
@@ -226,6 +258,11 @@ install_node_pkgs () {
 		#npm config ls -l
 		#echo "--------------------------------"
 
+		#c9-core-installer...
+		npm config delete cache
+		npm config delete tmp
+		npm config delete python
+
 		#fix npm in chroot.. (did i mention i hate npm...)
 		if [ ! -d /root/.npm ] ; then
 			mkdir -p /root/.npm
@@ -248,10 +285,7 @@ install_node_pkgs () {
 
 		if [ -f /usr/bin/make ] ; then
 			echo "Installing bonescript"
-			TERM=dumb npm install -g bonescript --arch=armhf
-			if [ -f /usr/local/lib/node_modules/bonescript/server.js ] ; then
-				sed -i -e 's:/usr/share/bone101:/var/lib/cloud9:g' /usr/local/lib/node_modules/bonescript/server.js
-			fi
+			TERM=dumb npm install -g bonescript@0.2.5
 		fi
 
 		cd /opt/
@@ -356,38 +390,6 @@ install_node_pkgs () {
 	fi
 }
 
-install_pip_pkgs () {
-	if [ -f /usr/bin/pip ] ; then
-		echo "Installing pip packages"
-		#Fixed in git, however not pushed to pip yet...(use git and install)
-		#libpython2.7-dev
-		#pip install Adafruit_BBIO
-
-		git_repo="https://github.com/adafruit/adafruit-beaglebone-io-python.git"
-		git_target_dir="/opt/source/adafruit-beaglebone-io-python"
-		git_clone
-		if [ -f ${git_target_dir}/.git/config ] ; then
-			cd ${git_target_dir}/
-			python setup.py install
-		fi
-	fi
-}
-
-install_gem_pkgs () {
-	if [ -f /usr/bin/gem ] ; then
-		echo "Installing gem packages"
-		echo "debug: gem: [`gem --version`]"
-		gem_wheezy="--no-rdoc --no-ri"
-		gem_jessie="--no-document"
-
-		echo "gem: [beaglebone]"
-		gem install beaglebone || true
-
-		echo "gem: [jekyll ${gem_jessie}]"
-		gem install jekyll ${gem_jessie} || true
-	fi
-}
-
 install_git_repos () {
 	git_repo="https://github.com/prpplague/Userspace-Arduino"
 	git_target_dir="/opt/source/Userspace-Arduino"
@@ -438,12 +440,7 @@ install_git_repos () {
 	fi
 
 	git_repo="https://github.com/RobertCNelson/dtb-rebuilder.git"
-	git_branch="3.14-ti"
-	git_target_dir="/opt/source/dtb-${git_branch}"
-	git_clone_branch
-
-	git_repo="https://github.com/RobertCNelson/dtb-rebuilder.git"
-	git_branch="4.1.x"
+	git_branch="4.1-ti"
 	git_target_dir="/opt/source/dtb-${git_branch}"
 	git_clone_branch
 
@@ -460,6 +457,8 @@ install_git_repos () {
 					make
 					make install
 					update-initramfs -u -k ${repo_rcnee_pkg_version}
+					rm -rf /home/${rfs_username}/git/ || true
+					make clean
 				fi
 			fi
 		fi
@@ -495,6 +494,8 @@ other_source_links () {
 	wget --directory-prefix="/opt/source/u-boot_${u_boot_release}/" ${rcn_https}/${u_boot_release}/0001-beagle_x15-uEnv.txt-bootz-n-fixes.patch
 
 	echo "u-boot_${u_boot_release} : /opt/source/u-boot_${u_boot_release}" >> /opt/source/list.txt
+
+	chown -R ${rfs_username}:${rfs_username} /opt/source/
 }
 
 unsecure_root () {
@@ -518,15 +519,18 @@ unsecure_root () {
 todo () {
 	#stuff i need to package in repos.rcn-ee.com
 	#
-	cd /
-	if [ ! -f /etc/Wireless/RT2870STA/RT2870STA.dat ] ; then
-		mkdir -p /etc/Wireless/RT2870STA/
-		cd /etc/Wireless/RT2870STA/
-		wget https://raw.githubusercontent.com/rcn-ee/mt7601u/master/src/RT2870STA.dat
+	is_kernel=$(echo ${repo_rcnee_pkg_version} | grep 4.1)
+	if [ ! "x${is_kernel}" = "x" ] ; then
 		cd /
-	fi
-	if [ ! -f /etc/modules-load.d/mt7601.conf ] ; then
-		echo "mt7601Usta" > /etc/modules-load.d/mt7601.conf
+		if [ ! -f /etc/Wireless/RT2870STA/RT2870STA.dat ] ; then
+			mkdir -p /etc/Wireless/RT2870STA/
+			cd /etc/Wireless/RT2870STA/
+			wget https://raw.githubusercontent.com/rcn-ee/mt7601u/master/src/RT2870STA.dat
+			cd /
+		fi
+		if [ ! -f /etc/modules-load.d/mt7601.conf ] ; then
+			echo "mt7601Usta" > /etc/modules-load.d/mt7601.conf
+		fi
 	fi
 }
 
@@ -536,8 +540,8 @@ setup_system
 setup_desktop
 
 install_gem_pkgs
-install_node_pkgs
 install_pip_pkgs
+install_node_pkgs
 if [ -f /usr/bin/git ] ; then
 	git config --global user.email "${rfs_username}@example.com"
 	git config --global user.name "${rfs_username}"

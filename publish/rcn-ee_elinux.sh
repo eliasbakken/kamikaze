@@ -12,11 +12,11 @@ fi
 
 ./RootStock-NG.sh -c rcn-ee_console_debian_jessie_armhf
 ./RootStock-NG.sh -c rcn-ee_console_debian_stretch_armhf
-./RootStock-NG.sh -c rcn-ee_console_ubuntu_stable_armhf
+./RootStock-NG.sh -c rcn-ee_console_ubuntu_trusty_armhf
 
 debian_stable="debian-8.1-console-armhf-${time}"
 debian_testing="debian-stretch-console-armhf-${time}"
-ubuntu_stable="ubuntu-14.04.2-console-armhf-${time}"
+ubuntu_stable="ubuntu-14.04.3-console-armhf-${time}"
 
 archive="xz -z -8 -v"
 
@@ -77,10 +77,14 @@ copy_img_to_mirror () {
 
 archive_img () {
         if [ -f \${wfile}.img ] ; then
-                if [ -f /usr/bin/bmaptool ] ; then
-                        bmaptool create -o \${wfile}.bmap \${wfile}.img
+                if [ ! -f \${wfile}.bmap ] ; then
+                        if [ -f /usr/bin/bmaptool ] ; then
+                                bmaptool create -o \${wfile}.bmap \${wfile}.img
+                        fi
                 fi
-                ${archive} \${wfile}.img
+                if [ ! -f \${wfile}.img.xz ] ; then
+                        ${archive} \${wfile}.img
+                fi
                 copy_img_to_mirror
         fi
 }
