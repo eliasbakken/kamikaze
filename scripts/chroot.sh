@@ -1100,7 +1100,7 @@ chroot_umount
 
 if [ "x${chroot_COPY_SETUP_SDCARD}" = "xenable" ] ; then
 	echo "Log: copying setup_sdcard.sh related files"
-	sudo cp ${DIR}/tools/setup_sdcard.sh ${DIR}/deploy/${export_filename}/
+	sudo cp ${DIR}/tools/setup_sdcard_kamikaze.sh ${DIR}/deploy/${export_filename}/setup_sdcard.sh
 	sudo mkdir -p ${DIR}/deploy/${export_filename}/hwpack/
 	sudo cp ${DIR}/tools/hwpack/*.conf ${DIR}/deploy/${export_filename}/hwpack/
 

@@ -65,8 +65,8 @@ setup_system () {
 
 	if [ -f /opt/scripts/boot/am335x_evm.sh ] ; then
 		if [ -f /lib/systemd/system/serial-getty@.service ] ; then
-			cp /lib/systemd/system/serial-getty@.service /etc/systemd/system/serial-getty@ttyGS0.service
-			ln -s /etc/systemd/system/serial-getty@ttyGS0.service /etc/systemd/system/getty.target.wants/serial-getty@ttyGS0.service
+			#cp /lib/systemd/system/serial-getty@.service /etc/systemd/system/serial-getty@ttyGS0.service
+			#ln -s /etc/systemd/system/serial-getty@ttyGS0.service /etc/systemd/system/getty.target.wants/serial-getty@ttyGS0.service
 
 			echo "" >> /etc/securetty
 			echo "#USB Gadget Serial Port" >> /etc/securetty
@@ -117,9 +117,9 @@ todo () {
 			wget https://raw.githubusercontent.com/rcn-ee/mt7601u/master/src/RT2870STA.dat
 			cd /
 		fi
-		if [ ! -f /etc/modules-load.d/mt7601.conf ] ; then
-			echo "mt7601Usta" > /etc/modules-load.d/mt7601.conf
-		fi
+		#if [ ! -f /etc/modules-load.d/mt7601.conf ] ; then
+		#	echo "mt7601u" > /etc/modules-load.d/mt7601.conf
+		#fi
 	fi
 
 
