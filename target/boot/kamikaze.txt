@@ -1,0 +1,1 @@
+cmdline=coherent_pool=1M quiet init=/lib/systemd/systemd consoleblank=0 fbcon=rotate:1 omap_wdt.nowayout=0
