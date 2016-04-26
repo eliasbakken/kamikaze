@@ -104,6 +104,15 @@ unsecure_root () {
 	fi
 }
 
+install_octoprint () {
+    cd /opt/source/
+    wget https://github.com/foosel/OctoPrint/archive/master.tar.gz
+    tar xf master.tar.gz
+    mv OctoPrint-master/ OctoPrint
+    cd OctoPrint
+    python setup.py install
+}
+
 
 todo () {
 	#stuff i need to package in repos.rcn-ee.com
